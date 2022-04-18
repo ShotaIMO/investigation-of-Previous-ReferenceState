@@ -37,12 +37,13 @@ In order to investigate these matter, I added sort of process to https://github.
 ## Procedure
   1. Run the nodes. By using following command, you will find AddressState hash.
         run vaultQuery contractStateType: net.corda.training.states.AddressState
+        
   2. Run PublishFlow.java.By using following command, you will find AddressState hash.
         run vaultQuery contractStateType: net.corda.training.states.AddressState
+        
   3. Run MoveFlow.java      ※You should confirm Transaction Hash.
+
   4. Run IOUIssueFlow.java  ※This process will not successful
+
   5. See the node log file and you will find the following error message.
         One or more input states or referenced states have already been used as input states in other transactions.
-
-
-  
