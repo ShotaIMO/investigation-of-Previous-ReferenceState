@@ -12,7 +12,7 @@ In order to investigate these matter, I added sort of process to https://github.
 
 **Reference State are not included in Transfer and Settle Flow.**
 
-**※To come to the point, this code will be error because previous Reference state cannnot includ in transaction.**
+**※To come to the point, this code will be error because previous Reference state cannnot include in transaction.**
 
 ## Newly added files
 ### Put under "contracts\src\main\java\net\corda\training\states"
