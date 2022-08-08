@@ -3,6 +3,7 @@ package net.corda.training.flow;
 import co.paralleluniverse.fibers.Suspendable;
 import net.corda.core.contracts.Command;
 import net.corda.core.contracts.StateAndRef;
+import net.corda.core.contracts.UniqueIdentifier;
 import net.corda.core.flows.*;
 import net.corda.core.identity.Party;
 import net.corda.core.transactions.SignedTransaction;
@@ -25,9 +26,11 @@ public class MoveFlow {
     @StartableByRPC
     public static class Initiator extends FlowLogic<StateAndRef<AddressState>>{
         private final String address;
+        private final UniqueIdentifier linearId;
 
-        public Initiator(String address){
+        public Initiator(String address, UniqueIdentifier linearId){
             this.address=address;
+            this.linearId=linearId;
         }
 
         ProgressTracker.Step ADDING_PARTY_TO_LIST = new ProgressTracker.Step("Sanctioning Party: ");
@@ -47,27 +50,38 @@ public class MoveFlow {
 
         @Suspendable
         @Override
-        public StateAndRef<AddressState> call() throws FlowException{
+        public StateAndRef<AddressState> call() throws FlowException {
             //1. Get a reference to the notary service on our network.
             Party notary = getServiceHub().getNetworkMapCache().getNotaryIdentities().get(0);
 
             //2. Find already published AddressState.
-            StateAndRef<AddressState> oldState=getServiceHub().getVaultService().queryBy(AddressState.class).getStates().get(0);
-            AddressState oldStateData=oldState.getState().getData();
-            String newAddress=address;
-            AddressState newAddressState=new AddressState(
+            StateAndRef<AddressState> oldState = null;
+            //Search Ref.State that matches parameter of linearId using "for loop".
+            for (int i = 0; i <= getServiceHub().getVaultService().queryBy(AddressState.class).getStates().size(); i++) {
+                oldState = getServiceHub().getVaultService().queryBy(AddressState.class).getStates().get(i);
+                UniqueIdentifier linearId_judge = oldState.getState().getData().getLinearId();
+                if (linearId.equals(linearId_judge)) {
+                    break;
+                }
+            }
+
+            AddressState oldStateData = oldState.getState().getData();
+            String newAddress = address;
+            UniqueIdentifier newLinearId = linearId;
+            AddressState newAddressState = new AddressState(
                     oldStateData.getIssuer(),
                     newAddress,
-                    oldStateData.getLinearId()
+                    newLinearId
             );
+            System.out.println("linearId_judge"+newLinearId);
 
-            //3. Add inputState, outputState and Command into Tx.
+
+            //3. Add inputState, outputState and Command into transaction.
             progressTracker.setCurrentStep(GENERATING_TRANSACTION);
-            Command txCommand=new Command(new AddressContract.Commands.Move(),getServiceHub().getMyInfo().getLegalIdentities().get(0).getOwningKey());
-
-            TransactionBuilder txBuilder=new TransactionBuilder(notary)
+            Command txCommand = new Command(new AddressContract.Commands.Move(), getServiceHub().getMyInfo().getLegalIdentities().get(0).getOwningKey());
+            TransactionBuilder txBuilder = new TransactionBuilder(notary)
                     .addInputState(oldState)
-                    .addOutputState(newAddressState,AddressContract.ADDRESS_CONTRACT_ID)
+                    .addOutputState(newAddressState, AddressContract.ADDRESS_CONTRACT_ID)
                     .addCommand(txCommand);
             progressTracker.setCurrentStep(ADDING_PARTY_TO_LIST);
 
@@ -78,7 +92,6 @@ public class MoveFlow {
 
             //4. Finalise the transaction.
             progressTracker.setCurrentStep(FINALISING_TRANSACTION);
-            //Notarise and record the transaction in both parties' vaults.
             return subFlow(
                     new FinalityFlow(partSignedTx, Collections.emptyList(), FINALISING_TRANSACTION.childProgressTracker())
             ).getTx().outRefsOfType(AddressState.class).get(0);
